@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>極簡現代井字棋 Tic-Tac-Toe</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter & Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', 'Noto Sans TC', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        /* Glassmorphism styling */
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Canvas smooth rendering & positioning */
+        .board-container {
+            position: relative;
+            aspect-ratio: 1 / 1;
+            width: 100%;
+            max-width: 380px;
+        }
+
+        /* Cell overlay styling */
+        .grid-cell {
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .grid-cell:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Custom subtle pulsing effect */
+        @keyframes subtle-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(0.98); }
+        }
+        
+        .pulse-active {
+            animation: subtle-pulse 1.8s infinite ease-in-out;
+        }
+
+        /* Smooth glow colors for X and O */
+        .glow-x {
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+        }
+        .glow-o {
+            box-shadow: 0 0 15px rgba(244, 63, 94, 0.3);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between items-center p-4 sm:p-6 select-none overflow-x-hidden">
+
+    <!-- Header Section -->
+    <header class="w-full max-w-md text-center mt-2 mb-4">
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-indigo-400 to-rose-400">
+            井字棋 <span class="text-xs uppercase tracking-widest text-slate-400 block sm:inline sm:ml-2">TIC-TAC-TOE</span>
+        </h1>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="w-full max-w-md flex flex-col items-center gap-4">
+
+        <!-- Mode Selector & Difficulty Toggle -->
+        <div class="glass-card w-full rounded-2xl p-2 flex flex-col gap-2 shadow-lg">
+            <!-- Mode Buttons -->
+            <div class="grid grid-cols-2 gap-2">
+                <button id="modePvP" onclick="setGameMode('pvp')" class="py-2.5 px-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                    <i class="fa-solid fa-users"></i> 同屏雙人
+                </button>
+                <button id="modeAI" onclick="setGameMode('ai')" class="py-2.5 px-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-robot"></i> 對戰 AI
+                </button>
+            </div>
+
+            <!-- AI Difficulty Options (Hidden by default) -->
+            <div id="aiDifficultyContainer" class="hidden grid-cols-2 gap-2 pt-1 border-t border-slate-700/50">
+                <button id="diffEasy" onclick="setAIDifficulty('easy')" class="py-1.5 text-xs font-semibold rounded-lg transition-all border bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                    初級 (簡單)
+                </button>
+                <button id="diffHard" onclick="setAIDifficulty('hard')" class="py-1.5 text-xs font-semibold rounded-lg transition-all border border-transparent text-slate-400 hover:text-slate-200">
+                    大師 (困難)
+                </button>
+            </div>
+        </div>
+
+        <!-- Score Board -->
+        <div class="glass-card w-full rounded-2xl p-4 shadow-xl grid grid-cols-3 text-center gap-2">
+            <!-- X Score -->
+            <div id="cardX" class="flex flex-col items-center p-2 rounded-xl border border-sky-500/30 bg-sky-500/10 transition-all">
+                <span class="text-sky-400 font-bold text-lg flex items-center gap-1">
+                    <i class="fa-solid fa-xmark"></i> 玩家 X
+                </span>
+                <span id="scoreX" class="text-2xl font-black text-slate-100 mt-1">0</span>
+            </div>
+
+            <!-- Ties Score -->
+            <div id="cardTie" class="flex flex-col items-center p-2 rounded-xl border border-slate-700 bg-slate-800/40 transition-all">
+                <span class="text-slate-400 font-bold text-lg flex items-center gap-1">
+                    <i class="fa-solid fa-handshake"></i> 平局
+                </span>
+                <span id="scoreTie" class="text-2xl font-black text-slate-100 mt-1">0</span>
+            </div>
+
+            <!-- O Score -->
+            <div id="cardO" class="flex flex-col items-center p-2 rounded-xl border border-transparent bg-slate-800/20 opacity-60 transition-all">
+                <span class="text-rose-400 font-bold text-lg flex items-center gap-1">
+                    <i class="fa-regular fa-circle"></i> <span id="labelPlayerO">玩家 O</span>
+                </span>
+                <span id="scoreO" class="text-2xl font-black text-slate-100 mt-1">0</span>
+            </div>
+        </div>
+
+        <!-- Status Message Indicator -->
+        <div class="w-full flex justify-center items-center my-1">
+            <div id="statusMessage" class="glass-card px-5 py-2 rounded-full text-sm font-semibold tracking-wide text-sky-400 flex items-center gap-2 shadow-md">
+                <span class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping"></span>
+                <span>輪到 玩家 X 下棋</span>
+            </div>
+        </div>
+
+        <!-- Game Canvas Board -->
+        <div class="board-container glass-card rounded-3xl p-3 shadow-2xl flex justify-center items-center relative overflow-hidden">
+            <!-- Canvas layer for smooth grid and symbol drawing -->
+            <canvas id="gameCanvas" class="w-full h-full block rounded-2xl cursor-pointer"></canvas>
+
+            <!-- Transparent Overlay Grid for Touch/Click targets -->
+            <div id="gridOverlay" class="absolute inset-3 grid grid-cols-3 grid-rows-3 gap-0">
+                <div class="grid-cell cursor-pointer rounded-tl-xl" data-index="0"></div>
+                <div class="grid-cell cursor-pointer" data-index="1"></div>
+                <div class="grid-cell cursor-pointer rounded-tr-xl" data-index="2"></div>
+                <div class="grid-cell cursor-pointer" data-index="3"></div>
+                <div class="grid-cell cursor-pointer" data-index="4"></div>
+                <div class="grid-cell cursor-pointer" data-index="5"></div>
+                <div class="grid-cell cursor-pointer rounded-bl-xl" data-index="6"></div>
+                <div class="grid-cell cursor-pointer" data-index="7"></div>
+                <div class="grid-cell cursor-pointer rounded-br-xl" data-index="8"></div>
+            </div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="w-full grid grid-cols-2 gap-3 mt-1">
+            <button onclick="resetBoard()" class="glass-card hover:bg-slate-700/50 text-slate-200 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md">
+                <i class="fa-solid fa-rotate-right"></i> 重置本局
+            </button>
+            <button onclick="clearScoreAndReset()" class="glass-card hover:bg-rose-500/20 hover:text-rose-300 text-slate-400 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md border-rose-500/20">
+                <i class="fa-solid fa-trash-can"></i> 清空比分
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-6 text-xs text-slate-500 text-center">
+        單檔案現代網頁遊戲 &bull; 極簡流暢體驗
+    </footer>
+
+    <!-- Game Logic JavaScript -->
+    <script>
+        // Game State Variables
+        let gameState = Array(9).fill(null); // 'X', 'O', or null
+        let currentPlayer = 'X'; // 'X' always goes first
+        let gameActive = true;
+        let gameMode = 'pvp'; // 'pvp' or 'ai'
+        let aiDifficulty = 'easy'; // 'easy' or 'hard'
+        let isAiThinking = false;
+
+        // Scores
+        let scores = { X: 0, O: 0, ties: 0 };
+
+        // Winning Combinations
+        const WINNING_COMBOS = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+            [0, 4, 8], [2, 4, 6]             // Diagonals
+        ];
+
+        // Canvas Elements & Rendering Context
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let cellSize = 0;
+        let dpr = window.devicePixelRatio || 1;
+
+        // Animations tracking
+        let activeAnimations = [];
+
+        // Colors Theme Constants
+        const COLOR_GRID = '#334155'; // slate-700
+        const COLOR_X = '#38bdf8';    // sky-400
+        const COLOR_O = '#f43f5e';    // rose-500
+        const COLOR_WIN_LINE = '#f59e0b'; // amber-500
+
+        // Initialization
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            initGridEvents();
+            drawGrid();
+            updateUI();
+        });
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            drawAll();
+        });
+
+        // Resize Canvas with high DPI support
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            dpr = window.devicePixelRatio || 1;
+            
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            
+            ctx.scale(dpr, dpr);
+            cellSize = rect.width / 3;
+        }
+
+        // Clear Canvas and Redraw Grid
+        function drawGrid() {
+            const width = canvas.width / dpr;
+            const height = canvas.height / dpr;
+
+            ctx.clearRect(0, 0, width, height);
+            ctx.strokeStyle = COLOR_GRID;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+
+            // Vertical lines
+            for (let i = 1; i < 3; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * cellSize, 12);
+                ctx.lineTo(i * cellSize, height - 12);
+                ctx.stroke();
+            }
+
+            // Horizontal lines
+            for (let i = 1; i < 3; i++) {
+                ctx.beginPath();
+                ctx.moveTo(12, i * cellSize);
+                ctx.lineTo(width - 12, i * cellSize);
+                ctx.stroke();
+            }
+        }
+
+        // Redraw Grid and existing Symbols
+        function drawAll() {
+            drawGrid();
+            for (let i = 0; i < 9; i++) {
+                if (gameState[i] === 'X') drawXInstant(i);
+                if (gameState[i] === 'O') drawOInstant(i);
+            }
+        }
+
+        // Click Event Handlers for Cells
+        function initGridEvents() {
+            const cells = document.querySelectorAll('.grid-cell');
+            cells.forEach(cell => {
+                cell.addEventListener('click', () => {
+                    const index = parseInt(cell.getAttribute('data-index'));
+                    handleCellClick(index);
+                });
+            });
+        }
+
+        // Handle Player Input
+        function handleCellClick(index) {
+            if (!gameActive || gameState[index] !== null || isAiThinking) return;
+
+            makeMove(index, currentPlayer);
+
+            // Check game status after human move
+            if (checkEndGame()) return;
+
+            // Handle AI Turn
+            if (gameMode === 'ai' && gameActive && currentPlayer === 'O') {
+                triggerAiMove();
+            }
+        }
+
+        // Execute a Move
+        function makeMove(index, symbol) {
+            gameState[index] = symbol;
+            
+            // Animate Drawing
+            if (symbol === 'X') {
+                animateX(index);
+            } else {
+                animateO(index);
+            }
+
+            // Switch Player turn
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            updateUI();
+        }
+
+        // Check Winner or Tie
+        function checkEndGame() {
+            let winningCombo = null;
+
+            for (let combo of WINNING_COMBOS) {
+                const [a, b, c] = combo;
+                if (gameState[a] && gameState[a] === gameState[b] && gameState[a] === gameState[c]) {
+                    winningCombo = combo;
+                    break;
+                }
+            }
+
+            if (winningCombo) {
+                gameActive = false;
+                const winner = gameState[winningCombo[0]];
+                scores[winner]++;
+                
+                // Highlight winning strike line
+                animateWinningLine(winningCombo, winner);
+                
+                // Update UI text
+                setTimeout(() => {
+                    setCustomStatus(`🎉 獲勝者：玩家 ${winner}！`, winner === 'X' ? 'text-sky-400' : 'text-rose-400');
+                    updateScoreBoard();
+                }, 300);
+                return true;
+            }
+
+            // Check Tie
+            if (!gameState.includes(null)) {
+                gameActive = false;
+                scores.ties++;
+                setCustomStatus('🤝 平局！棋逢敵手', 'text-amber-400');
+                updateScoreBoard();
+                return true;
+            }
+
+            return false;
+        }
+
+        // Animated X Drawing
+        function animateX(index) {
+            const row = Math.floor(index / 3);
+            const col = index % 3;
+            const x = col * cellSize;
+            const y = row * cellSize;
+            const padding = cellSize * 0.25;
+
+            const startX1 = x + padding;
+            const startY1 = y + padding;
+            const endX1 = x + cellSize - padding;
+            const endY1 = y + cellSize - padding;
+
+            const startX2 = x + cellSize - padding;
+            const startY2 = y + padding;
+            const endX2 = x + padding;
+            const endY2 = y + cellSize - padding;
+
+            let progress = 0;
+            const duration = 200; // ms
+            const startTime = performance.now();
+
+            function step(currentTime) {
+                const elapsed = currentTime - startTime;
+                progress = Math.min(elapsed / duration, 1);
+
+                ctx.strokeStyle = COLOR_X;
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
+
+                // First line (\)
+                if (progress <= 0.5) {
+                    const p1 = progress * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(startX1, startY1);
+                    ctx.lineTo(startX1 + (endX1 - startX1) * p1, startY1 + (endY1 - startY1) * p1);
+                    ctx.stroke();
+                } else {
+                    // Draw full first line
+                    ctx.beginPath();
+                    ctx.moveTo(startX1, startY1);
+                    ctx.lineTo(endX1, endY1);
+                    ctx.stroke();
+
+                    // Second line (/)
+                    const p2 = (progress - 0.5) * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(startX2, startY2);
+                    ctx.lineTo(startX2 + (endX2 - startX2) * p2, startY2 + (endY2 - startY2) * p2);
+                    ctx.stroke();
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        // Draw Instant X (for redraw)
+        function drawXInstant(index) {
+            const row = Math.floor(index / 3);
+            const col = index % 3;
+            const x = col * cellSize;
+            const y = row * cellSize;
+            const padding = cellSize * 0.25;
+
+            ctx.strokeStyle = COLOR_X;
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+
+            ctx.beginPath();
+            ctx.moveTo(x + padding, y + padding);
+            ctx.lineTo(x + cellSize - padding, y + cellSize - padding);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x + cellSize - padding, y + padding);
+            ctx.lineTo(x + padding, y + cellSize - padding);
+            ctx.stroke();
+        }
+
+        // Animated O Drawing
+        function animateO(index) {
+            const row = Math.floor(index / 3);
+            const col = index % 3;
+            const centerX = col * cellSize + cellSize / 2;
+            const centerY = row * cellSize + cellSize / 2;
+            const radius = cellSize * 0.28;
+
+            let progress = 0;
+            const duration = 250; // ms
+            const startTime = performance.now();
+
+            function step(currentTime) {
+                const elapsed = currentTime - startTime;
+                progress = Math.min(elapsed / duration, 1);
+
+                ctx.strokeStyle = COLOR_O;
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
+
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * progress));
+                ctx.stroke();
+
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        // Draw Instant O (for redraw)
+        function drawOInstant(index) {
+            const row = Math.floor(index / 3);
+            const col = index % 3;
+            const centerX = col * cellSize + cellSize / 2;
+            const centerY = row * cellSize + cellSize / 2;
+            const radius = cellSize * 0.28;
+
+            ctx.strokeStyle = COLOR_O;
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // Draw Animated Line Overlay across winning combo
+        function animateWinningLine(combo, winner) {
+            const startCell = combo[0];
+            const endCell = combo[2];
+
+            const startRow = Math.floor(startCell / 3);
+            const startCol = startCell % 3;
+            const endRow = Math.floor(endCell / 3);
+            const endCol = endCell % 3;
+
+            const startX = startCol * cellSize + cellSize / 2;
+            const startY = startRow * cellSize + cellSize / 2;
+            const endX = endCol * cellSize + cellSize / 2;
+            const endY = endRow * cellSize + cellSize / 2;
+
+            let progress = 0;
+            const duration = 300;
+            const startTime = performance.now();
+
+            function step(currentTime) {
+                const elapsed = currentTime - startTime;
+                progress = Math.min(elapsed / duration, 1);
+
+                const currentX = startX + (endX - startX) * progress;
+                const currentY = startY + (endY - startY) * progress;
+
+                ctx.strokeStyle = winner === 'X' ? COLOR_X : COLOR_O;
+                ctx.lineWidth = 8;
+                ctx.lineCap = 'round';
+
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(currentX, currentY);
+                ctx.stroke();
+
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        // AI Logic Implementation
+        function triggerAiMove() {
+            isAiThinking = true;
+            setCustomStatus('🤖 AI 正在思考中...', 'text-rose-400 animate-pulse');
+
+            setTimeout(() => {
+                let moveIndex;
+                if (aiDifficulty === 'easy') {
+                    moveIndex = getEasyAiMove();
+                } else {
+                    moveIndex = getBestMinimaxMove();
+                }
+
+                isAiThinking = false;
+                if (moveIndex !== null && moveIndex !== undefined) {
+                    makeMove(moveIndex, 'O');
+                    checkEndGame();
+                }
+            }, 400 + Math.random() * 200); // Natural random delay
+        }
+
+        // Easy AI: Pick random available spot
+        function getEasyAiMove() {
+            const available = gameState.map((v, i) => v === null ? i : null).filter(v => v !== null);
+            if (available.length === 0) return null;
+            return available[Math.floor(Math.random() * available.length)];
+        }
+
+        // Hard AI: Minimax Algorithm (Unbeatable)
+        function getBestMinimaxMove() {
+            let bestScore = -Infinity;
+            let bestMove = null;
+
+            for (let i = 0; i < 9; i++) {
+                if (gameState[i] === null) {
+                    gameState[i] = 'O'; // Try move for AI
+                    let score = minimax(gameState, 0, false);
+                    gameState[i] = null; // Undo move
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = i;
+                    }
+                }
+            }
+            return bestMove;
+        }
+
+        function minimax(board, depth, isMaximizing) {
+            // Evaluate state
+            const winner = checkSimulatedWinner(board);
+            if (winner === 'O') return 10 - depth;
+            if (winner === 'X') return depth - 10;
+            if (!board.includes(null)) return 0; // Tie
+
+            if (isMaximizing) {
+                let bestScore = -Infinity;
+                for (let i = 0; i < 9; i++) {
+                    if (board[i] === null) {
+                        board[i] = 'O';
+                        let score = minimax(board, depth + 1, false);
+                        board[i] = null;
+                        bestScore = Math.max(score, bestScore);
+                    }
+                }
+                return bestScore;
+            } else {
+                let bestScore = Infinity;
+                for (let i = 0; i < 9; i++) {
+                    if (board[i] === null) {
+                        board[i] = 'X';
+                        let score = minimax(board, depth + 1, true);
+                        board[i] = null;
+                        bestScore = Math.min(score, bestScore);
+                    }
+                }
+                return bestScore;
+            }
+        }
+
+        function checkSimulatedWinner(board) {
+            for (let combo of WINNING_COMBOS) {
+                const [a, b, c] = combo;
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                    return board[a];
+                }
+            }
+            return null;
+        }
+
+        // Mode and Difficulty Controls
+        function setGameMode(mode) {
+            if (gameMode === mode) return;
+            gameMode = mode;
+
+            // UI Button Toggle
+            const pvpBtn = document.getElementById('modePvP');
+            const aiBtn = document.getElementById('modeAI');
+            const aiDiffContainer = document.getElementById('aiDifficultyContainer');
+            const labelPlayerO = document.getElementById('labelPlayerO');
+
+            if (mode === 'pvp') {
+                pvpBtn.className = "py-2.5 px-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 bg-sky-500/20 text-sky-400 border border-sky-500/30";
+                aiBtn.className = "py-2.5 px-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 text-slate-400 hover:text-slate-200";
+                aiDiffContainer.classList.add('hidden');
+                aiDiffContainer.classList.remove('grid');
+                labelPlayerO.innerText = '玩家 O';
+            } else {
+                aiBtn.className = "py-2.5 px-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 bg-rose-500/20 text-rose-400 border border-rose-500/30";
+                pvpBtn.className = "py-2.5 px-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 text-slate-400 hover:text-slate-200";
+                aiDiffContainer.classList.remove('hidden');
+                aiDiffContainer.classList.add('grid');
+                labelPlayerO.innerText = '電腦 AI';
+            }
+
+            clearScoreAndReset();
+        }
+
+        function setAIDifficulty(diff) {
+            aiDifficulty = diff;
+            const easyBtn = document.getElementById('diffEasy');
+            const hardBtn = document.getElementById('diffHard');
+
+            if (diff === 'easy') {
+                easyBtn.className = "py-1.5 text-xs font-semibold rounded-lg transition-all border bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+                hardBtn.className = "py-1.5 text-xs font-semibold rounded-lg transition-all border border-transparent text-slate-400 hover:text-slate-200";
+            } else {
+                hardBtn.className = "py-1.5 text-xs font-semibold rounded-lg transition-all border bg-purple-500/20 text-purple-400 border-purple-500/30";
+                easyBtn.className = "py-1.5 text-xs font-semibold rounded-lg transition-all border border-transparent text-slate-400 hover:text-slate-200";
+            }
+
+            resetBoard();
+        }
+
+        // Reset Current Board
+        function resetBoard() {
+            gameState = Array(9).fill(null);
+            currentPlayer = 'X';
+            gameActive = true;
+            isAiThinking = false;
+            drawGrid();
+            updateUI();
+        }
+
+        // Reset Game & Scores
+        function clearScoreAndReset() {
+            scores = { X: 0, O: 0, ties: 0 };
+            updateScoreBoard();
+            resetBoard();
+        }
+
+        // UI State Updates
+        function updateUI() {
+            if (!gameActive) return;
+
+            const cardX = document.getElementById('cardX');
+            const cardO = document.getElementById('cardO');
+
+            if (currentPlayer === 'X') {
+                cardX.className = "flex flex-col items-center p-2 rounded-xl border border-sky-500/50 bg-sky-500/20 glow-x transition-all scale-105";
+                cardO.className = "flex flex-col items-center p-2 rounded-xl border border-transparent bg-slate-800/20 opacity-60 transition-all scale-100";
+                setCustomStatus('輪到 玩家 X 下棋', 'text-sky-400');
+            } else {
+                cardO.className = "flex flex-col items-center p-2 rounded-xl border border-rose-500/50 bg-rose-500/20 glow-o transition-all scale-105";
+                cardX.className = "flex flex-col items-center p-2 rounded-xl border border-transparent bg-slate-800/20 opacity-60 transition-all scale-100";
+                const playerLabel = gameMode === 'ai' ? '電腦 AI' : '玩家 O';
+                setCustomStatus(`輪到 ${playerLabel} 下棋`, 'text-rose-400');
+            }
+        }
+
+        function setCustomStatus(text, colorClass) {
+            const statusBox = document.getElementById('statusMessage');
+            statusBox.className = `glass-card px-5 py-2 rounded-full text-sm font-semibold tracking-wide flex items-center gap-2 shadow-md ${colorClass}`;
+            statusBox.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-current animate-pulse"></span><span>${text}</span>`;
+        }
+
+        function updateScoreBoard() {
+            document.getElementById('scoreX').innerText = scores.X;
+            document.getElementById('scoreO').innerText = scores.O;
+            document.getElementById('scoreTie').innerText = scores.ties;
+        }
+    </script>
+</body>
+</html>
